@@ -7,7 +7,18 @@ logger = logging.getLogger(__name__)
 
 class ArrayGenerator(DefaultCanvas):
 
-    
+    def __init__(self, pdk, height, fin, gate, gateDummy, shared_diff, stack):
+
+        self.nselect = self.addGen( Region( 'nselect', 'Nselect',
+                                            v_grid=CenteredGrid( offset= self.pdk['Poly']['Pitch']//2, pitch= self.pdk['Poly']['Pitch']),
+                                            h_grid=self.fin.clg))
+        self.pselect = self.addGen( Region( 'pselect', 'Pselect',
+                                            v_grid=CenteredGrid( offset= self.pdk['Poly']['Pitch']//2, pitch= self.pdk['Poly']['Pitch']),
+                                            h_grid=self.fin.clg))
+        self.nwell = self.addGen( Region( 'nwell', 'Nwell',
+                                            v_grid=CenteredGrid( offset= self.pdk['Poly']['Pitch']//2, pitch= self.pdk['Poly']['Pitch']),
+                                            h_grid=self.fin.clg))  
+
     def _addMOSArray( self, x_cells, y_cells, pattern, vt_type, connections, minvias = 1, **parameters):
         if minvias * len(connections) > self.m2PerUnitCell - 1:
             self.minvias = (self.m2PerUnitCell - 1) // len(connections)
