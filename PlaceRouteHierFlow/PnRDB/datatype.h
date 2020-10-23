@@ -383,6 +383,7 @@ struct hierNode {
   vector<Multi_LinearConst> ML_Constraints;
   int bias_Hgraph=0;
   int bias_Vgraph=0;
+
   vector<Router_report> router_report;
 
 

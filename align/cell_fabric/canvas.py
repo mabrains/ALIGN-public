@@ -89,6 +89,46 @@ class Canvas:
 
         self.addWire( wire, netName, pinName, c, mn, mx)
 
+    def connectWiresByVia(self, layer_l, layer_h, net_name=None):
+
+        def is_overlapping(r1, r2):
+            if r1[0] < r2[2] and r2[0] < r1[2]:
+                if r1[1] < r2[3] and r2[1] < r1[3]:
+                    return True
+            return False
+
+        _ = self.removeDuplicates()
+
+        mh_lines = self.rd.store_scan_lines[layer_h]
+        ml_lines = self.rd.store_scan_lines[layer_l]
+
+        lyr_h = getattr(self, str.lower(layer_h))
+        lyr_l = getattr(self, str.lower(layer_l))
+        via = getattr(self, f'v{layer_l[1:]}')
+
+        mh_dir = self.pdk[layer_h]['Direction'].upper()
+        assert mh_dir in ['V', 'H']
+
+        for (mh_cl, mh_sl) in mh_lines.items():
+            mh_c_idx = lyr_h.clg.inverseBounds(mh_cl//2)[0]
+            for (mh_idx, mh_slr) in enumerate(mh_sl.rects):
+                mh_name = mh_slr.netName
+                if (mh_name is None) or (net_name is not None and mh_name != net_name):
+                    continue
+                for (ml_cl, ml_sl) in ml_lines.items():
+                    ml_c_idx = lyr_l.clg.inverseBounds(ml_cl // 2)[0]
+                    for (ml_idx, ml_slr) in enumerate(ml_sl.rects):
+                        ml_name = ml_slr.netName
+                        if ml_name is None or ml_name != mh_name:
+                            continue
+                        if ml_name == mh_name:
+                            if mh_dir == 'V':
+                                if is_overlapping(ml_slr.rect, mh_slr.rect):
+                                    self.addVia(via, ml_name, None, mh_c_idx, ml_c_idx)
+                            else:
+                                if is_overlapping(ml_slr.rect, mh_slr.rect):
+                                    self.addVia(via, ml_name, None, ml_c_idx, mh_c_idx)
+
     def asciiStickDiagram( self, v1, m2, v2, m3, matrix, *, xpitch=4, ypitch=2):
         # clean up text input
         a = matrix.split( '\n')[1:-1]
