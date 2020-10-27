@@ -108,6 +108,11 @@ M3 (DD DA S B) PMOS_VTL w=w l=90n
 M4 (DE DA S B) PMOS_VTL w=w l=90n
 .ends CMB_PMOS_4
 
+.subckt INV_LVT i zn SN SP
+M0 zn i SN SN NMOS_VTL w=w0 l=l0
+M1 zn i SP SP PMOS_VTL w=w1 l=l0
+.ends INV_LVT
+
 .subckt stage2_inv G1 G2 SN SP
 MM0 G1 D SN SN NMOS l=60n w=1u m=1
 MM1 D G2 SN SN NMOS l=60n w=1u m=1
