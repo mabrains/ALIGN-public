@@ -75,9 +75,9 @@ class Scanline:
         return 'Scanline( rects=' + str(self.rects) + ')'
 
     def find_touching(self, via_rect):
-#
-# Linear search --- could improve performance by binary search since rects are sorted
-#
+        #
+        # Linear search --- could improve performance by binary search since rects are sorted
+        #
         result = None
         for metal_rect in self.rects:
             if RemoveDuplicates.touching( via_rect.rect, metal_rect.rect):
@@ -98,7 +98,7 @@ class RemoveDuplicates():
                     tbl[id(slr.root())].append( (slr,root.netName,layer))
 
         for (i,s) in tbl.items():
-            logger.info( pprint.pformat(["Equivalence classes:", i, s]))
+            logger.debug( pprint.pformat(["Equivalence classes:", i, s]))
 
     def check_opens(self):
 
@@ -131,7 +131,7 @@ class RemoveDuplicates():
         # not touching if completely to left or right or above or below
         return not (rA[2] < rB[0] or rB[2] < rA[0] or rA[3] < rB[1] or rB[3] < rA[1])
 
-    def __init__( self, canvas, *, nets_allowed_to_be_open=None):
+    def __init__( self, canvas, *, nets_allowed_to_be_open=None, allow_opens=False):
         self.canvas = canvas
         self.store_scan_lines = None
         self.different_widths = []
@@ -145,9 +145,10 @@ class RemoveDuplicates():
             self.nets_allowed_to_be_open = set([])
         else:
             self.nets_allowed_to_be_open = set(nets_allowed_to_be_open)
+        self.allow_opens = bool(allow_opens)
 
     def set_open( self, nm, opn):
-        if nm not in self.nets_allowed_to_be_open:
+        if nm not in self.nets_allowed_to_be_open and not self.allow_opens:
             self.opens.append( opn)
 
     def setup_layer_structures( self):
@@ -294,15 +295,15 @@ class RemoveDuplicates():
     def generate_rectangles( self):
 
         terminals = []
-#
-# Write out regions
-#
+        #
+        # Write out regions
+        #
         for d in self.canvas.terminals:
             if d['layer'] in self.skip_layers:
                 terminals.append( d)
-#
-# Write out the rectangles stored in the scan line data structure
-#
+        #
+        # Write out the rectangles stored in the scan line data structure
+        #
         for layer, vv in self.store_scan_lines.items():
             for _, v in vv.items():
                 for slr in v.rects:
@@ -330,7 +331,7 @@ class RemoveDuplicates():
         for dif in self.different_widths:
             logger.warning( "DIFFERENT WIDTH" + pprint.pformat(dif))
         for subinst in self.subinsts:
-            logger.info("SUBINST" + pprint.pformat(subinst))
+            logger.debug("SUBINST" + pprint.pformat(subinst))
 
         return self.generate_rectangles()
 

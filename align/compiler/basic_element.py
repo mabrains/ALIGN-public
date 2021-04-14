@@ -72,13 +72,17 @@ class BasicElement:
              The assumption is 2 port network
         """
         self.get_elements(2)
+        value = parse_value(self.value, "cap")
+        if 'c' in value.keys():
+            value['cap'] = value['c']
+            del value['c']
         return {
             "inst": self.inst,
             "inst_type": "cap",
             "real_inst_type": self.real_inst_type,
             "ports": self.pins,
             "edge_weight": [1]*(self.num_pins),
-            "values": parse_value(self.value, "cap")
+            "values": value
         }
 
     def resistor(self):
@@ -86,13 +90,17 @@ class BasicElement:
              The assumption is 2 port network
         """
         self.get_elements(2)
+        value = parse_value(self.value, "res")
+        if 'r' in value.keys():
+            value['res'] = value['r']
+            del value['r']
         return {
             "inst": self.inst,
             "inst_type": "res",
             "real_inst_type": self.real_inst_type,
             "ports": self.pins,
             "edge_weight": [1]*(self.num_pins),
-            "values": parse_value(self.value, "res")
+            "values": value
         }
 
     def inductor(self):
@@ -154,8 +162,8 @@ class BasicElement:
 
     def transistor(self):
         """transistor: m5 net5 phi2 0 0 nmos_rvt w=81e-9 l=20e-9 nfin=3
-             The assumption is 3 port network
-             pins = [drain, gate, source]
+             The assumption is 4 port network
+             pins = [drain, gate, source, body]
         """
         logger.debug(f"Querying transistor {self.line}")
         self.get_elements(4)
@@ -175,9 +183,8 @@ class BasicElement:
             "inst": self.inst,
             "inst_type": inst_type,
             "real_inst_type": self.real_inst_type,
-            "body_pin":self.pins[3],
-            "ports": self.pins[0:3],
-            "edge_weight": self.pin_weight[0:3],
+            "ports": self.pins[0:4],
+            "edge_weight": self.pin_weight[0:4],
             "values": parse_value(self.value)
         }
 
@@ -222,12 +229,15 @@ def _parse_inst(line):
         logger.debug(f'FOUND i_source: {line.strip()}')
         device = element.i_source()
     elif line.strip().lower().startswith('c') \
-            or ( line.strip().lower().startswith('xc') \
+            or (line.strip().lower().startswith('xc') \
             and 'cap' in  line.strip().split()[3].lower()):
         #DESIGN=Sanitized_TX_8l12b has XC for caps
         logger.debug(f'FOUND cap: {line.strip()}')
         device = element.capacitor()
-    elif line.strip().lower().startswith('r') or line.strip().lower().startswith('xr'):
+    elif line.strip().lower().startswith('r') \
+            or (line.strip().lower().startswith('xr') \
+            and 'res' in line.strip().split()[3].lower()):
+        #modified for frontend design from NW
         logger.debug(f'FOUND resistor: {line.strip()}')
         device = element.resistor()
     elif line.strip().lower().startswith('l'):
@@ -266,7 +276,6 @@ def _parse_inst(line):
             "inst_type": hier_nodes[-1],
             "real_inst_type": hier_nodes[-1],
             "ports": hier_nodes[1:-1],
-            #"edge_weight": list(range(len(hier_nodes[1:-1]))),
             "values": device_param_list
         }
         logger.debug(f'FOUND subckt instance: {device["inst"]}, type {device["inst_type"]}')
@@ -284,7 +293,7 @@ def _parse_inst(line):
             device["inst_type"] = "align_"+device["inst_type"]
 
     elif line.startswith('*'):
-        logger.info(f"comment: {line}")
+        logger.debug(f"comment: {line}")
     else:
         logger.warning(f"Extraction error: {line} (unidentified line)")
 

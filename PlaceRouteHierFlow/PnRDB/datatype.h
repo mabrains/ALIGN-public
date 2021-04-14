@@ -47,6 +47,9 @@ struct PortPos;
 struct Router_report;
 struct routing_net;
 struct Boundary;
+struct LinearConst;
+struct Multi_LinearConst;
+struct Multi_connection;
 struct GuardRing;
 struct Guardring_Const;
 
@@ -229,6 +232,7 @@ struct net {
   vector<std::vector<int>> connectedTile;
   double upperBound = INT_MAX;
   double lowerBound = INT_MIN;
+  int multi_connection = 1;
 }; // structure of nets
 
 struct Metal{
@@ -397,10 +401,13 @@ struct hierNode {
   vector<Guardring_Const> Guardring_Consts;
   vector<LinearConst> L_Constraints;
   vector<Multi_LinearConst> ML_Constraints;
-  int bias_Hgraph=0;
+  vector<pair<vector<int>, Smark>> Ordering_Constraints;
+  int bias_Hgraph = 0;
   int bias_Vgraph=0;
+  double Aspect_Ratio_weight = 1000;
+  double Aspect_Ratio[2] = {0, 100};
   vector<Router_report> router_report;
-
+  vector<Multi_connection> Multi_connections;
 
 }; // structure of vertex in heirarchical tree
 
@@ -511,6 +518,7 @@ struct Multi_LinearConst {
 
 };
 
+
 struct C_const {
 
   string net_name;
@@ -519,6 +527,13 @@ struct C_const {
   std::vector<std::pair<int,int> > start_pin; //pair.first blocks id pair.second pin id 
   std::vector<std::pair<int,int> > end_pin; // if pair.frist blocks id = -1 then it's terminal
   vector<double> C;
+
+};
+
+struct Multi_connection{
+
+  string net_name;
+  int multi_number = 1;
 
 };
 
@@ -604,6 +619,16 @@ struct guardring_info {
   GdsDatatype gds_datatype;
 };
 
+struct design_info {
+  int Hspace = 0, Vspace = 0;  // global Hspace and Vspace in placement
+  int signal_routing_metal_l;
+  int signal_routing_metal_u;
+  int power_grid_metal_l;
+  int power_grid_metal_u;
+  int power_routing_metal_l;
+  int power_routing_metal_u;  
+};
+
 struct Drc_info {
   int MaxLayer; //index
   map<string, int> Metalmap, Viamap; // map from metal/via's name(M1, M2, V1...) to metal/via's index in the below vectors
@@ -615,9 +640,8 @@ struct Drc_info {
   vector<string> MaskID_Via;
   Boundary top_boundary;
   guardring_info Guardring_info; //guardring info read from layers.json
+  design_info Design_info;       // design ingo from layer.json
 };
-
-
 
 struct routing_net{
    

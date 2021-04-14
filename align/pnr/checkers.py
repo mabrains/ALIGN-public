@@ -1,4 +1,3 @@
-
 from ..cell_fabric import transformation, pdk
 from .. import primitive
 import itertools
@@ -7,6 +6,9 @@ import importlib
 import sys
 import pathlib
 import re
+from .toplevel import NType
+
+from .render_placement import gen_transformation
 
 import logging
 logger = logging.getLogger(__name__)
@@ -40,10 +42,6 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
 
     errors = []
 
-    t_tbl = { "M1": "m1", "M2": "m2", "M3": "m3",
-              "M4": "m4", "M5": "m5", "M6": "m6",
-              "M7": "m7", "M8": "m8"}
-
     def add_terminal( netName, layer, b, tag=None):
 
         r = [ b.LL.x, b.LL.y, b.UR.x, b.UR.y]
@@ -75,7 +73,8 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
             else:
                 center = None
             if center is not None:
-                f( cnv.generators[t_tbl[layer]], center, tag)
+                lyr = layer.lower() if layer.lower() in cnv.generators else layer.upper()
+                f( cnv.generators[lyr], center, tag)
 
     if not checkOnly and draw_grid:
         m1_pitch = 2*cnv.pdk['M1']['Pitch']
@@ -95,7 +94,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
     fa_map = {}
     for n in itertools.chain( hN.Nets, hN.PowerNets):
         for c in n.connected:
-            if c.type == 'Block':
+            if c.type == 'Block' or c.type == NType.Block:
                 cblk = hN.Blocks[c.iter2]
                 blk = cblk.instance[cblk.selectedInstance]
                 block_name = blk.name
@@ -104,11 +103,12 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                 formal_name = f"{blk.name}/{pin.name}"
                 assert formal_name not in fa_map
                 fa_map[formal_name] = n.name
-
-            else:
+            elif c.type == 'Terminal' or c.type == NType.Terminal:
                 term = hN.Terminals[c.iter]
                 terminal_name = term.name
-                assert terminal_name == n.name
+                assert n.name == terminal_name
+            else:
+                assert False, c.type
 
     for cblk in hN.Blocks:
         blk = cblk.instance[cblk.selectedInstance]
@@ -116,7 +116,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
         if json_dir is not None:
             pth = pathlib.Path( json_dir + "/" + blk.master + ".json")
             if not pth.is_file():
-                logger.info( f"{pth} is not available; not importing subblock rectangles")
+                logger.debug( f"{pth} is not available; not importing subblock rectangles")
             else:
                 found = True
 
@@ -130,7 +130,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                 if not pth.is_file():
                     logger.error( f"{pth} not found in input_dir")
                 else:
-                    logger.info( f"{pth} found in input_dir")
+                    logger.debug( f"{pth} found in input_dir")
                     found = True
             else:
                 logger.error( f"{blk.gdsFile} does not end in .gds")
@@ -141,14 +141,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
             # Scale to PnRDB coords (seems like 10x um, but PnRDB is 2x um, so divide by 5
             rational_scaling( d, div=5, errors=errors)
 
-            tr = transformation.Transformation.genTr( blk.orient, w=blk.width, h=blk.height)
-
-            tr2 = transformation.Transformation( oX=blk.placedBox.UR.x - blk.originBox.LL.x,
-                                                 oY=blk.placedBox.UR.y - blk.originBox.LL.y)
-
-            tr3 = tr.preMult(tr2)
-
-            logger.info( f"TRANS {blk.master} {blk.orient} {tr} {tr2} {tr3}")
+            tr3 = gen_transformation( blk)
             for term in d['terminals']:
                 term['rect'] = tr3.hitRect( transformation.Rect( *term['rect'])).canonical().toList()
 
@@ -193,7 +186,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                 add_terminal( obj, con.metal, b, tag=tag)
 
         for c in n.connected:
-            if c.type == 'Block':
+            if c.type == 'Block' or c.type == NType.Block:
                 cblk = hN.Blocks[c.iter2]
                 blk = cblk.instance[cblk.selectedInstance]
                 block_name = blk.name
@@ -206,7 +199,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
 
                 for con in pin.pinContacts:
                     addt( n, con, "blockPin")
-            else:
+            elif c.type == 'Terminal' or c.type == NType.Terminal:
                 term = hN.Terminals[c.iter]
                 terminal_name = term.name
                 assert terminal_name == n.name
@@ -215,6 +208,9 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                 for con in term.termContacts:
                     pass
 #                    addt( n, con)
+            else:
+                assert False, c.type
+
 
         for metal in n.path_metal:
             con = metal.MetalRect
@@ -258,7 +254,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                     if ly != "":
                         d0 = {"netName": k+"_tm", "layer": ly, "rect": r}
                         d1 = {"netName": conn['sink_name'], "layer": ly, "rect": r}
-                        logger.info( f"Add two terminals: {d0} {d1}")
+                        logger.debug( f"Add two terminals: {d0} {d1}")
                         terminals.append( d0)
                         terminals.append( d1)
 
@@ -276,7 +272,7 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
                 if r[0] == r[2] and r[1] == r[3]:
                     logger.error( f"0-dimensional global route {v} {r}")
 
-                logger.info( f"Global route: {k} {ly} {r}")
+                logger.debug( f"Global route: {k} {ly} {r}")
 
                 for q in [0,1]:
                     if r[q] == r[q+2]:
@@ -301,6 +297,8 @@ def gen_viewer_json( hN, *, pdkdir, draw_grid=False, global_route_json=None, jso
     # Create viewer dictionary
 
     d = {}
+
+    logger.debug( f'bbox: {hN.LL.x} {hN.LL.y} {hN.UR.x} {hN.UR.y}')
 
     d["bbox"] = [hN.LL.x,hN.LL.y,hN.UR.x,hN.UR.y]
 

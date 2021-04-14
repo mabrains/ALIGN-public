@@ -14,7 +14,11 @@
 #include <iterator>
 #include <assert.h>
 #include <cctype>
+#ifdef WINDOWS
+#include <Windows.h> // getcwd
+#else
 #include <unistd.h> // getcwd
+#endif
 #include <map>
 #include <set>
 #include <utility>//std::pair, make_pair
@@ -24,22 +28,8 @@
 #include "RawRouter.h"
 #include "Rdatatype.h"
 #include "../PnRDB/datatype.h"
-
-/*
-#ifdef _cplusplus
-extern "C" {
-#endif
-
-#include <stdio.h>
-#include "lp_lib.h"
-#define LPSOLVEAPIFROMLIBDEF
-#include "lp_explicit.h"
-
-#ifdef _cplusplus
-}
-#endif
-*/
-
+#include <nlohmann/json.hpp>
+#include <iomanip>
 
 extern "C"
 {
@@ -47,7 +37,7 @@ extern "C"
 #include "lp_lib.h"
 }
 
-
+using namespace nlohmann;
 class GcellGlobalRouter : public RawRouter {
  
   friend class GlobalGrid;
@@ -95,6 +85,8 @@ class GcellGlobalRouter : public RawRouter {
     //vector<PnRDB::Drc_info> drc_info;
     //int lowest_metal, highest_metal; //index of lowest metal & highest metal
     //int grid_scale; //dynamic grid_scal
+    typedef void (lphandlestr_func)(lprec *lp, void *userhandle, char *buf);
+    static void lpsolve_logger(lprec *lp, void *userhandle, char *buf);
 
   public:
     GcellGlobalRouter();
@@ -142,6 +134,13 @@ class GcellGlobalRouter : public RawRouter {
     //void ConvertToViaPnRDB_Placed_Origin(PnRDB::Via& temp_via, RouterDB::Via& router_via);
     //void ConvertToViaPnRDB_Placed_Placed(PnRDB::Via& temp_via, RouterDB::Via& router_via);
     //void TerminalToNodeTerminal(PnRDB::hierNode& HierNode);
+
+    void PlotGlobalRouter();
+    void PlotGlobalRouter_Json(PnRDB::hierNode& node);
+    void AddContact(PnRDB::contact &temp_contact, json& temp_json_Contact, int unit);
+    void AddContacts(std::vector<PnRDB::contact> &temp_contact, json& temp_json_Contact, int unit);
+    std::vector<int> Found_Center_Point(std::vector<int> pin_tile);
+    void Seleced_Center_Point(std::vector<int> &terminals, std::vector<std::vector<int> >& connected_tile);
     
 };
 

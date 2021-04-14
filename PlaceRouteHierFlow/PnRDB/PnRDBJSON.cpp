@@ -1,4 +1,3 @@
-#include <gtest/gtest.h>
 #include "PnRdatabase.h"
 //#include "../router/Rdatatype.h"
 
@@ -716,47 +715,14 @@ namespace PnRDB {
 
 };
 
-TEST( hierNodeTest, TestA)
-{
-  PnRDB::hierNode hN;
-  hN.name = "hierNodeName";
-
-  json json_hN(hN);
-
-  EXPECT_EQ( json_hN["name"], "hierNodeName");
-
-  {
-    std::ofstream jsonStream( "__json");
-    if(jsonStream.fail()) {
-      cout<< "Cannot open file "<< "__json" <<" for writing"<<endl;
-      return;
-    }
-    jsonStream << std::setw(4) << json_hN;
-    jsonStream.close();
-  }
-
-}
-
-TEST( hierNodeTest, TestInOut)
-{
-  std::ifstream ifs( "telescopic_ota-freeze.json");
-  json j = json::parse( ifs);
-
-  PnRDB::hierNode hN;
-
-  j.get_to( hN);
-
-  json json_hN(hN);
-
-  EXPECT_EQ( j, json_hN);
-
-}
-
 void PnRdatabase::WriteDBJSON( const PnRDB::hierNode& hN, const string& filename) const
 {
+
+  auto logger = spdlog::default_logger()->clone("PnRDB.PnRdatabase.WriteDBJSON");
+
   std::ofstream jsonStream( filename);
   if(jsonStream.fail()) {
-    cout<< "Cannot open file " << filename << " for writing" << endl;
+    logger->error("Cannot open file {0} for writing",filename);
     return;
   }
   jsonStream << json(hN);
@@ -764,9 +730,12 @@ void PnRdatabase::WriteDBJSON( const PnRDB::hierNode& hN, const string& filename
 
 void PnRdatabase::ReadDBJSON( PnRDB::hierNode& hN, const string& filename) const
 {
+
+  auto logger = spdlog::default_logger()->clone("PnRDB.PnRdatabase.ReadDBJSON");
+
   std::ifstream ifs( filename);
   if(ifs.fail()) {
-    cout<< "Cannot open file " << filename << " for reading." << endl;
+    logger->error("Cannot open file {0} for writing",filename);
     return;
   }
   json::parse(ifs).get_to( hN);

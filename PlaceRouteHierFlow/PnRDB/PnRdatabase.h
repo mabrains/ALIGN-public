@@ -5,6 +5,7 @@
 #include <map>
 #include <unordered_map>
 #include <vector>
+#include <tuple>
 #include <queue>
 #include <string>
 #include <limits.h>
@@ -16,21 +17,27 @@
 #include <utility> // pair, make_pair
 #include <algorithm>
 #include <sstream>
-#include <unistd.h>
+#ifdef WINDOWS
+#include <Windows.h> // getcwd
+#else
+#include <unistd.h> // getcwd
+#endif
 #include <set>
 #include "datatype.h"
 #include "readfile.h"
 #include <nlohmann/json.hpp>
 #include "Lexer.h"
+#include "spdlog/spdlog.h"
 
 using std::map;
 using std::unordered_map;
 using std::vector;
-using std::queue;
+using std::deque;
 using std::string;
 using std::cout;
 using std::endl;
 using std::pair;
+using std::tuple;
 using std::cerr;
 using std::ifstream;
 using std::istream;
@@ -41,11 +48,8 @@ using namespace nlohmann;
 class PnRdatabase;
 
 class ReadVerilogHelper {
-
-
-    PnRDB::hierNode temp_node,clear_node;
-    PnRDB::hierNode Supply_node;
-
+    PnRDB::hierNode temp_node;
+    vector<tuple<string,string,string> > global_signals;
     PnRdatabase& db;
 
 public:
@@ -54,13 +58,11 @@ public:
       return db;
     }
 
-    PnRDB::hierNode& get_Supply_node() {
-      return Supply_node;
+    const vector<tuple<string,string,string> >& get_global_signals() const {
+      return global_signals;
     }
 
     ReadVerilogHelper( PnRdatabase& db_in) : db(db_in) {}
-
-    void operator()(istream& fin, const string& fpath, const string& topcell);
 
     void parse_module( Lexer& l, bool celldefine_mode=false);
 
@@ -70,7 +72,6 @@ public:
 
     int process_connection( int iter, const string& net_name,
 			    unordered_map<string,int>& net_map);
-    void semantic( const string& fpath, const string& topcell);
 };
 
 
@@ -84,10 +85,9 @@ class PnRdatabase
     PnRDB::designRule drData;
 
     void UpdateHierNodeParent(int nodeID); // update parent node of current node
-    void TraverseDFS(queue<int>& Q, vector<string>& color, int idx); // DFS subfunc to traverse hierarchical tree 
+    void TraverseDFS(deque<int>& Q, vector<string>& color, int idx); // DFS subfunc to traverse hierarchical tree 
 
-    void ReadPDKJSON(string drfile);
-
+ public: 
     // Not implemented
     PnRdatabase(const PnRdatabase& other); // copy constructor
     PnRdatabase& operator= (const PnRdatabase& other); // copy assignment function
@@ -102,16 +102,25 @@ class PnRdatabase
     // constructor with augments
     PnRdatabase(string path, string topcell, string vname, string lefname, string mapname, string drname);
     // destructor
-    ~PnRdatabase() {}
+    ~PnRdatabase();
 
     int get_unitScale() const { return unitScale; }
     int get_maxNode() const { return maxNode; }
 
     long int get_number(string str);
 
-    queue<int> TraverseHierTree(); // traverse hierarchical tree in topological order
+    void ReadPDKJSON(string drfile);
+    void semantic0( const string& topcell);
+    void semantic1( const vector<tuple<string,string,string> >& global_signals);
+    void semantic2();
+    void attach_constraint_files( const string& fpath);
+
+    deque<int> TraverseHierTree(); // traverse hierarchical tree in topological order
+
     PnRDB::hierNode CheckoutHierNode(int nodeID); // check out data of specific hierarchical node
     std::vector<PnRDB::hierNode> CheckoutHierNodeVec(int nodeID);//checkout nodeVec, which consists of different placement
+    void AppendToHierTree( const PnRDB::hierNode& updatedNode); // append node to end of hierTree
+    void SetParentInHierTree( int idx, int pidx, int parent_id); // set parent: hierTree[idx].parent[pidx] = parent_id
     void CheckinHierNode(int nodeID, const PnRDB::hierNode& updatedNode); // check out data of specific hierarchical node
     void CheckinChildnodetoBlock(PnRDB::hierNode &parent, int blockID, const PnRDB::hierNode &updatedNode);
     void updatePowerPins(PnRDB::pin &temp_pin);
@@ -147,13 +156,13 @@ class PnRdatabase
     PnRDB::Omark RelOrt2AbsOrt(PnRDB::Omark current_node_ort, PnRDB::Omark childnode_ort);
     void ExtractPinsToPowerPins(PnRDB::hierNode &updatedNode);
 
-    void ReadVerilog(istream &inps, const string &fpath, const string &topcell);
     bool ReadVerilog(const string &fpath, const string &vname, const string &topcell);
 
     bool ReadLEF(string leffile); // read building block data from LEF file
     void PrintLEFData();          // print LEF data for debugging
     map<string, vector<PnRDB::lefMacro>> checkoutlef() { return lefData; };
     bool ReadConstraint(PnRDB::hierNode &node, string fpath, string suffix);
+    bool ReadConstraint_Json(PnRDB::hierNode &node, string fpath, string suffix);
     bool MergeLEFMapData(PnRDB::hierNode &node);
     void PrintHierTree();
     bool ReadMap(string fpath, string mapname); // read gds data from map file
@@ -190,8 +199,12 @@ class PnRdatabase
     void WriteGcellGlobalRoute(const PnRDB::hierNode &node, const string &rofile, const string &opath) const;
     void WriteLef(const PnRDB::hierNode &node, const string &file, const string &opath) const;
     void Write_Router_Report(PnRDB::hierNode &node, const string &opath);
+    void extend_pin_function();
+    void extend_pins(PnRDB::block &temp_block);
+    void extend_pin(PnRDB::pin &temp_pin, int width, int height);
     void Write_Power_Mesh_Conf(std::string outputfile);
     void Write_Current_Workload(PnRDB::hierNode &node, double total_current, int current_number, std::string outputfile);
+    void WriteGcellDetailRoute(const PnRDB::hierNode& node, const string& rofile, const string& opath) const;
     
 };
 
